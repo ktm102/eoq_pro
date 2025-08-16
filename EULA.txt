@@ -1,0 +1,32 @@
+EOQ Pro — End User License Agreement (EULA)
+Versione breve — uso non esclusivo, singolo utente
+
+1. Licenza
+   Ti viene concessa una licenza personale, non esclusiva e non trasferibile per installare ed usare EOQ Pro su un massimo di 2 dispositivi di tua proprietà.
+
+2. Restrizioni
+   Non puoi rivendere, sub-licenziare, distribuire il software senza consenso scritto. È vietato il reverse engineering salvo quanto consentito dalle leggi applicabili.
+
+3. Proprietà
+   EOQ Pro e tutta la documentazione rimangono di proprietà dell’autore. La licenza non trasferisce alcun diritto di proprietà intellettuale.
+
+4. Supporto
+   Il supporto è “best effort” e non garantito. Aggiornamenti e correzioni possono essere rilasciati a discrezione dell’autore.
+
+5. Esclusione di garanzia
+   EOQ Pro è fornito “COSÌ COM’È”, senza garanzie di alcun tipo, espresse o implicite (incluse commerciabilità, idoneità per uno scopo particolare, assenza di errori).
+
+6. Limitazione di responsabilità
+   Nei limiti massimi di legge, l’autore non è responsabile per danni indiretti, incidentali, speciali, consequenziali o perdita di profitti derivanti dall’uso o dall’impossibilità d’uso del software.
+
+7. Dati e privacy
+   EOQ Pro opera offline e non invia dati a server esterni. Vedi l’Informativa Privacy allegata per i dettagli su contatti di supporto e fatturazione.
+
+8. Risoluzione
+   La licenza termina in caso di violazione delle condizioni. Alla risoluzione devi cessare l’uso ed eliminare le copie.
+
+9. Legge applicabile
+   Questa licenza è regolata dalla legge italiana, salvo diversa previsione imperativa.
+
+Contatti
+   Email supporto: vendite@tuaazienda.it
