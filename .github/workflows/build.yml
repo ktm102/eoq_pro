@@ -8,6 +8,8 @@ jobs:
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
+    # Se vuoi che Windows pubblichi anche se Mac/Linux falliscono:
+    continue-on-error: ${{ matrix.os != 'windows-latest' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -16,31 +18,81 @@ jobs:
         with:
           python-version: "3.12"
 
+      # DEBUG: conferma che eoq_pro.py sia in root
+      - name: Debug layout
+        shell: bash
+        run: |
+          echo "PWD: $(pwd)"
+          echo "Tree (root):"
+          ls -la
+          echo "Cerca eoq_pro.py:"
+          find . -maxdepth 3 -name "eoq_pro.py" -print || true
+          python -V
+
+      # Linux: Tkinter (evita _tkinter not found)
       - name: Install tkinter on Linux
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-tk
+          sudo apt-get install -y python3-tk || sudo apt-get install -y python3.12-tk
+
+      # macOS: fallback Tcl/Tk (in alcuni runner serve)
+      - name: Install Tcl/Tk on macOS (fallback)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install tcl-tk || true
+          echo 'TK_SILENCE_DEPRECATION=1' >> $GITHUB_ENV
 
       - name: Install PyInstaller
         run: python -m pip install --upgrade pip pyinstaller
 
-      - name: Build app
+      # Build binario/app — opzionali: icona, version file, key cifratura (PYI_KEY)
+      - name: Build app (PyInstaller)
         shell: bash
         env:
           PYI_KEY: ${{ secrets.PYI_KEY }}
         run: |
-          ADDDATA=""; [[ -f brand_logo.svg ]] && ADDDATA="--add-data brand_logo.svg:."
-          ICON=""; if [[ "$RUNNER_OS" == "Windows" && -f app.ico ]]; then ICON="--icon app.ico"; fi
-          if [[ "$RUNNER_OS" == "macOS" && -f app.icns ]]; then ICON="--icon app.icns"; fi
-          KEYOPT=""; [[ -n "${PYI_KEY}" ]] && KEYOPT="--key ${PYI_KEY}"
-          python -m PyInstaller --noconsole --onefile --name EOQ_Pro $ADDDATA $ICON $KEYOPT eoq_pro.py
+          ICON=""
+          if [ "$RUNNER_OS" = "Windows" ] && [ -f app.ico ]; then ICON='--icon app.ico'; fi
+          if [ "$RUNNER_OS" = "macOS" ] && [ -f app.icns ]; then ICON='--icon app.icns'; fi
+          VER=""
+          [ -f version_info.txt ] && VER="--version-file version_info.txt"
+          KEY=""
+          [ -n "$PYI_KEY" ] && KEY="--key $PYI_KEY"
+          python -m PyInstaller --noconsole --onefile --name EOQ_Pro $ICON $VER $KEY eoq_pro.py
 
-      - name: Package per OS (no source in ZIP)
+      # --- Packaging per OS (no sorgenti .py negli ZIP) ---
+      - name: Package Windows
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path EOQ_Pro_Demo | Out-Null
+          if (!(Test-Path dist/EOQ_Pro.exe)) { throw "Manca dist/EOQ_Pro.exe" }
+          Copy-Item -Force dist/EOQ_Pro.exe EOQ_Pro_Demo/
+          if (Test-Path Guida_EOQ_Pro_Semplice_compact.pdf) { Copy-Item Guida_EOQ_Pro_Semplice_compact.pdf EOQ_Pro_Demo/Guida_EOQ_Pro.pdf }
+          if (Test-Path Guida_EOQ_Pro_Semplice.txt) { Copy-Item Guida_EOQ_Pro_Semplice.txt EOQ_Pro_Demo/Guida_EOQ_Pro.txt }
+          if (Test-Path README_EOQ_Pro_Semplice.md) { Copy-Item README_EOQ_Pro_Semplice.md EOQ_Pro_Demo/README.md }
+          if (Test-Path EULA.txt) { Copy-Item EULA.txt EOQ_Pro_Demo/ }
+          if (Test-Path Privacy_Policy.txt) { Copy-Item Privacy_Policy.txt EOQ_Pro_Demo/ }
+          if (Test-Path eoq_demo_sample.csv) { Copy-Item eoq_demo_sample.csv EOQ_Pro_Demo/ }
+          if (Test-Path brand_logo.svg) { Copy-Item brand_logo.svg EOQ_Pro_Demo/ }
+          if (Test-Path VERSION) { Copy-Item VERSION EOQ_Pro_Demo/ }
+          Compress-Archive -Path 'EOQ_Pro_Demo/*' -DestinationPath 'eoq_pro_windows.zip' -Force
+          $z=[IO.Compression.ZipFile]::OpenRead('eoq_pro_windows.zip'); $bad=$false; foreach($e in $z.Entries){ if($e.FullName.ToLower().EndsWith('.py')){ $bad=$true; Write-Host 'Trovato sorgente nello ZIP:' $e.FullName } } $z.Dispose(); if($bad){ throw 'ZIP contiene file .py' } else { Write-Host 'Verifica OK: nessun .py nello ZIP.' }
+
+      - name: Package macOS
+        if: matrix.os == 'macos-latest'
         shell: bash
         run: |
-          mkdir EOQ_Pro_Demo
-          # NO SOURCE: niente cp eoq_pro.py
+          set -e
+          mkdir -p EOQ_Pro_Demo
+          if [ -d dist/EOQ_Pro.app ]; then
+            cp -R dist/EOQ_Pro.app EOQ_Pro_Demo/
+          elif [ -f dist/EOQ_Pro ]; then
+            cp dist/EOQ_Pro EOQ_Pro_Demo/
+          else
+            echo "Build mancante (né .app né binario)"; exit 1
+          fi
           [ -f Guida_EOQ_Pro_Semplice_compact.pdf ] && cp Guida_EOQ_Pro_Semplice_compact.pdf EOQ_Pro_Demo/Guida_EOQ_Pro.pdf
           [ -f Guida_EOQ_Pro_Semplice.txt ] && cp Guida_EOQ_Pro_Semplice.txt EOQ_Pro_Demo/Guida_EOQ_Pro.txt
           [ -f README_EOQ_Pro_Semplice.md ] && cp README_EOQ_Pro_Semplice.md EOQ_Pro_Demo/README.md
@@ -49,20 +101,27 @@ jobs:
           [ -f eoq_demo_sample.csv ] && cp eoq_demo_sample.csv EOQ_Pro_Demo/
           [ -f brand_logo.svg ] && cp brand_logo.svg EOQ_Pro_Demo/
           [ -f VERSION ] && cp VERSION EOQ_Pro_Demo/
+          ditto -c -k --sequesterRsrc --keepParent "EOQ_Pro_Demo" "eoq_pro_macos.zip"
+          unzip -l eoq_pro_macos.zip | awk '{print tolower($0)}' | grep -E "\.py$" && { echo 'ERRORE: trovati .py nello ZIP'; exit 1; } || echo 'Verifica OK: nessun .py nello ZIP.'
 
-          if [ "$RUNNER_OS" = "Windows" ]; then
-            cp dist/EOQ_Pro.exe EOQ_Pro_Demo/
-            pwsh -NoProfile -Command "Compress-Archive -Path 'EOQ_Pro_Demo\*' -DestinationPath 'eoq_pro_windows.zip' -Force"
-            pwsh -NoProfile -Command "$z=[IO.Compression.ZipFile]::OpenRead('eoq_pro_windows.zip');$bad=$false;foreach($e in $z.Entries){if($e.FullName.ToLower().EndsWith('.py')){$bad=$true;Write-Host 'Trovato sorgente nello ZIP:' $e.FullName}};$z.Dispose();if($bad){exit 1}else{Write-Host 'Verifica OK: nessun .py nello ZIP.'}"
-          elif [ "$RUNNER_OS" = "macOS" ]; then
-            if [ -d dist/EOQ_Pro.app ]; then cp -R dist/EOQ_Pro.app EOQ_Pro_Demo/; else cp dist/EOQ_Pro EOQ_Pro_Demo/; fi
-            ditto -c -k --sequesterRsrc --keepParent "EOQ_Pro_Demo" "eoq_pro_macos.zip"
-            unzip -l eoq_pro_macos.zip | awk '{print tolower($0)}' | grep -E "\.py$" && { echo 'ERRORE: trovati .py nello ZIP'; exit 1; } || echo 'Verifica OK: nessun .py nello ZIP.'
-          else
-            cp dist/EOQ_Pro EOQ_Pro_Demo/
-            zip -r eoq_pro_linux.zip EOQ_Pro_Demo >/dev/null
-            unzip -l eoq_pro_linux.zip | awk '{print tolower($0)}' | grep -E "\.py$" && { echo 'ERRORE: trovati .py nello ZIP'; exit 1; } || echo 'Verifica OK: nessun .py nello ZIP.'
-          fi
+      - name: Package Linux
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          set -e
+          mkdir -p EOQ_Pro_Demo
+          [ -f dist/EOQ_Pro ] || { echo "Manca dist/EOQ_Pro"; exit 1; }
+          cp dist/EOQ_Pro EOQ_Pro_Demo/
+          [ -f Guida_EOQ_Pro_Semplice_compact.pdf ] && cp Guida_EOQ_Pro_Semplice_compact.pdf EOQ_Pro_Demo/Guida_EOQ_Pro.pdf
+          [ -f Guida_EOQ_Pro_Semplice.txt ] && cp Guida_EOQ_Pro_Semplice.txt EOQ_Pro_Demo/Guida_EOQ_Pro.txt
+          [ -f README_EOQ_Pro_Semplice.md ] && cp README_EOQ_Pro_Semplice.md EOQ_Pro_Demo/README.md
+          [ -f EULA.txt ] && cp EULA.txt EOQ_Pro_Demo/
+          [ -f Privacy_Policy.txt ] && cp Privacy_Policy.txt EOQ_Pro_Demo/
+          [ -f eoq_demo_sample.csv ] && cp eoq_demo_sample.csv EOQ_Pro_Demo/
+          [ -f brand_logo.svg ] && cp brand_logo.svg EOQ_Pro_Demo/
+          [ -f VERSION ] && cp VERSION EOQ_Pro_Demo/
+          zip -r eoq_pro_linux.zip EOQ_Pro_Demo >/dev/null
+          unzip -l eoq_pro_linux.zip | awk '{print tolower($0)}' | grep -E "\.py$" && { echo 'ERRORE: trovati .py nello ZIP'; exit 1; } || echo 'Verifica OK: nessun .py nello ZIP.'
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
