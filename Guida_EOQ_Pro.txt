@@ -1,0 +1,215 @@
+GUIDA PRATICA A EOQ PRO (VERSIONE SEMPLICE)
+==============================================
+
+Scopo del programma
+-------------------
+EOQ Pro ti aiuta a:
+1) calcolare il lotto economico di ordinazione (EOQ), cioè quante unità ordinare ogni volta per minimizzare i costi di ordinazione e mantenimento scorte;
+2) stimare il punto di riordino (ROP) e la scorta di sicurezza in modo da ridurre il rischio di rimanere senza merce durante l’attesa dell’ordine (lead time);
+3) produrre un report (HTML/PDF) e/o esportare i risultati in CSV per condividerli o analizzarli.
+
+È pensato per chi NON ha esperienza in logistica: inserisci alcuni numeri semplici e ottieni i risultati spiegati passo passo.
+
+
+PRIMA DI INIZIARE
+-----------------
+Requisiti minimi
+- Python 3.x installato sul tuo PC (Windows, macOS o Linux).
+- Tkinter (di solito è già incluso con Python).
+
+Opzionali (per funzionalità extra)
+- Matplotlib → per vedere il grafico “costi vs Q”.
+  Installazione:    pip install matplotlib
+- ReportLab → per esportare PDF (il report HTML è sempre disponibile).
+  Installazione:    pip install reportlab
+
+Avvio del programma
+- Salva il file: eoq_pro.py
+- Apri il terminale / Prompt dei comandi nella cartella dove hai salvato il file.
+- Esegui:           python eoq_pro.py
+
+
+CONCETTI (spiegati facile)
+--------------------------
+D (Domanda annua): quante unità vendi/consumi in un anno. Esempio: 12.000 unità/anno.
+S (Costo di setup/ordine): costo fisso per ogni ordine (spedizione, amministrazione…). Esempio: 50 €/ordine.
+H (Costo di mantenimento): quanto costa tenere 1 unità a magazzino per 1 anno (affitto, capitale, assicurazione…). Esempio: 2 €/unità/anno.
+
+L (Lead time, giorni): giorni medi tra l’invio dell’ordine e l’arrivo della merce. Esempio: 10 giorni.
+σ (sigma, deviazione standard giornaliera): misura l’oscillazione della domanda GIORNALIERA. Se non sai stimarla, inizia con 0 (nessuna variabilità) o un valore piccolo (es. 2-3).
+CSL (Livello di servizio): probabilità di NON andare in stockout durante il lead time. Se lasci vuoto, il programma usa 0,95 (95%). Valori tipici: 0,90–0,99.
+
+Cosa calcola il programma
+- EOQ (Q*): quantità ottima per ordine.
+- Costi:
+  * Costo di ordinazione = (D / Q) * S
+  * Costo di mantenimento = (Q / 2) * H
+  * Costo totale = somma dei due (non include la scorta di sicurezza).
+- ROP (punto di riordino): a che livello di scorta riordinare.
+- Scorta di sicurezza (SS): “cuscinetto” extra per coprire la variabilità della domanda/lead time.
+
+Formule usate (non devi calcolarle tu!)
+- EOQ = √( 2 * D * S / H )
+- μ_d (domanda media giornaliera) = D / 365
+- SS = z * σ * √L, dove z dipende dal CSL (es. CSL=0,95 ⇒ z≈1,6449)
+- ROP = μ_d * L + SS
+
+
+COME SI USA L’INTERFACCIA
+-------------------------
+La finestra è divisa in 3 aree:
+1) Tabella di input (in alto): ogni riga = un “anno” o “scenario”.
+   - Colonne: D, S, H (obbligatorie) + L, σ, CSL (opzionali).
+2) Pulsanti principali:
+   - “Aggiungi riga”: inserisci un nuovo scenario.
+   - “Pulisci tutto”: cancella gli input.
+   - “Calcola”: esegue i calcoli e riempie la tabella risultati.
+3) Tabella dei risultati (in basso): per ogni riga mostra EOQ, costi, ROP e Scorta di sicurezza.
+
+Menù in alto:
+- File → Nuovo / Apri progetto… / Salva progetto: per salvare/caricare i tuoi input (.json).
+- File → Importa CSV… / Esporta CSV…: per lavorare con Excel/Google Sheets.
+- File → Report HTML… (sempre) / Report PDF… (se hai ReportLab).
+- Strumenti → Grafico costi vs Q (se hai Matplotlib).
+- Brand → Imposta brand…: nome/colore/logo nei report (opzionale).
+- Aiuto → Guida rapida / Info.
+
+
+LINEE GUIDA PER I DATI
+----------------------
+Unità coerenti:
+- Se D è “unità/anno”, allora H deve essere “€/unità/anno”.
+- L è sempre in “giorni”.
+- σ è “unità/giorno”.
+
+Inserimento numeri:
+- Puoi usare “,” o “.” come separatore decimale (es. 1.500,25 o 1500.25).
+- I campi obbligatori (D, S, H) devono essere > 0.
+- Se σ=0 o L=0 ⇒ Scorta di sicurezza = 0 (quindi CSL non influisce).
+
+CSL (default 0,95 se lasci vuoto):
+- Aumentare il CSL aumenta la Scorta di sicurezza e il ROP (ordini prima).
+- L’EOQ non dipende dal CSL (dipende solo da D, S, H).
+
+
+ESEMPIO COMPLETO (con numeri)
+-----------------------------
+Supponiamo:
+- D = 12.000 unità/anno
+- S = 50 €/ordine
+- H = 2 €/unità/anno
+- L = 10 giorni
+- σ = 3 unità/giorno
+- CSL = 0,95 (se lo lasci vuoto, il programma userà comunque 0,95)
+
+Risultati attesi (circa):
+1) EOQ (Q*):
+   Q* = √(2 * 12.000 * 50 / 2) = √(600.000) ≈ 774,60 unità per ordine
+2) Costi annui (relativi all’EOQ):
+   - Costo di ordinazione = (D/Q) * S = (12.000 / 774,60) * 50 ≈ 774,3 €
+   - Costo di mantenimento = (Q/2) * H = (774,60 / 2) * 2 ≈ 774,6 €
+   - Totale ≈ 1.548,9 €
+3) ROP e Scorta di sicurezza:
+   - μ_d = D / 365 ≈ 32,88 unità/giorno
+   - z per CSL 0,95 ≈ 1,6449
+   - SS = z * σ * √L = 1,6449 * 3 * √10 ≈ 15,6 unità
+   - ROP = μ_d * L + SS ≈ 32,88 * 10 + 15,6 ≈ 344,4 unità
+
+Interpretazione:
+- Ogni volta che la scorta scende a ~344 unità, effettua un ordine di ~775 unità.
+- Con questi parametri, il rischio di stockout durante il lead time è ~5% (CSL=95%).
+
+
+CSV: COME IMPORTARE/ESPORTARE
+-----------------------------
+Formato atteso (separatore “;” punto e virgola):
+D;S;H;L;sigma;CSL
+
+Esempio di CSV (con intestazione):
+D;S;H;L;sigma;CSL
+12000;50;2;10;3;0.95
+8000;40;1.5;7;2;0.90
+15000;60;2;12;0;          ← se lasci CSL vuoto, userò 0.95
+
+Importa CSV
+- File → Importa CSV… e seleziona il file .csv.
+- Se c’è l’intestazione, il programma la riconosce e la salta.
+
+Esporta CSV
+- Prima premi “Calcola”.
+- File → Esporta CSV… e scegli dove salvare i risultati.
+
+
+REPORT (HTML/PDF)
+-----------------
+- Report HTML…: sempre disponibile. File → Report HTML…
+- Report PDF…: disponibile se hai installato ReportLab. File → Report PDF…
+- I report includono:
+  * tabella dei risultati
+  * formule usate
+  * (opzionale) nome/colore/logo impostati in Brand → Imposta brand…
+
+Nota: il costo totale mostrato riguarda l’EOQ “puro” e non include il costo dovuto alla scorta di sicurezza. Questo è normale nella formula classica EOQ.
+
+
+GRAFICO “COSTI VS Q”
+--------------------
+- Mostra come varia il costo totale annuo al variare della quantità per ordine Q.
+- La linea tratteggiata indica Q*, cioè l’EOQ.
+- Serve Matplotlib: pip install matplotlib
+- Uso: Strumenti → Grafico costi vs Q (almeno una riga con D, S, H validi).
+
+
+ERRORI COMUNI E SOLUZIONI
+-------------------------
+1) “Valori non validi” / “devono essere numeri > 0”
+   - Controlla di aver inserito numeri nei campi obbligatori D, S, H (niente testo o caselle vuote).
+2) Il tasto “Report PDF…” non fa nulla
+   - Installa ReportLab: pip install reportlab
+3) Il grafico non compare
+   - Installa Matplotlib: pip install matplotlib
+   - Assicurati di avere almeno una riga con D, S, H validi.
+4) CSL fuori range
+   - Inserisci valori tra ~0,80 e ~0,995. Se lasci vuoto, uso 0,95.
+5) ROP o Scorta di sicurezza “troppo bassi” o “zero”
+   - Controlla L (lead time) e σ (deviazione standard). Se uno dei due è 0, la scorta di sicurezza è 0.
+6) Decimali con la virgola
+   - Va bene sia “,” che “.” (es. 1.500,25 o 1500.25).
+7) Unità di misura
+   - Sii coerente: D in unità/anno, H in €/unità/anno, L in giorni, σ in unità/giorno.
+
+
+FAQ (domande ricorrenti)
+------------------------
+• Devo sempre usare σ e CSL?
+  No. Inseriscili se vuoi calcolare ROP e scorta di sicurezza. Altrimenti lasciali vuoti e otterrai solo EOQ e costi.
+
+• Aumentare il CSL fa aumentare l’EOQ?
+  No. L’EOQ dipende solo da D, S, H. Il CSL influenza SS e ROP.
+
+• Non so stimare σ (deviazione standard). Posso usare 0?
+  Sì. Con σ=0 non avrai scorta di sicurezza (SS=0) e ROP=μ_d * L. È un punto di partenza prudente ma potresti avere stockout.
+
+• Posso cambiare l’orizzonte temporale (es. D mensile)?
+  Sì, se resti coerente nelle unità e trasformi tutto in “per anno” (consigliato). Altrimenti adatta la formula di μ_d di conseguenza.
+
+• Posso salvare e ricaricare il lavoro?
+  Sì, con File → Salva/Apri progetto (.json).
+
+
+CHECKLIST RAPIDA
+----------------
+1) Inserisci D, S, H (obbligatori).
+2) (Opzionale) Inserisci L, σ, CSL se vuoi ROP e Scorta.
+3) Premi “Calcola” e leggi la tabella risultati.
+4) Se serve, esporta CSV o crea il report HTML/PDF.
+5) (Opzionale) Vedi il grafico costi vs Q per capire visivamente l’EOQ.
+
+
+NOTE FINALI
+-----------
+- “EOQ Pro – Versione Semplice” punta alla chiarezza: meno campi, risultati chiari.
+- Se in futuro vorrai funzioni extra (classi ABC con CSL automatico, suggerimenti di CSL, costi di stockout, ecc.) è possibile passare alla versione avanzata.
+- In caso di dubbi, chiedi: posso aiutarti a personalizzare l’app per il tuo specifico contesto (reparti, listini, stagionalità).
+
+Buon lavoro!
